@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>QuizBuzz – Player</title>
+  <link rel="stylesheet" href="/public/style.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet"/>
+</head>
+<body class="player-body">
+  <div class="bg-glow"></div>
+
+  <!-- Name Entry Screen -->
+  <div id="name-screen" class="screen active">
+    <div class="name-card glass">
+      <div class="name-icon">🎮</div>
+      <h2>Join Quiz</h2>
+      <p>Enter your name to get your buzzer</p>
+      <div class="input-group">
+        <input type="text" id="player-name-input" placeholder="Your name..." maxlength="20" autocomplete="off"/>
+      </div>
+      <button id="join-btn" class="btn btn-primary">
+        Get Buzzer <span>→</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Buzzer Screen -->
+  <div id="buzzer-screen" class="screen">
+    <div class="player-header glass">
+      <div class="player-avatar" id="player-avatar">A</div>
+      <div>
+        <div class="player-name-display" id="player-name-display">Player</div>
+        <div class="question-badge">Question <span id="q-number">1</span></div>
+      </div>
+      <div class="connection-dot" id="connection-dot" title="Connected"></div>
+    </div>
+
+    <!-- Status message -->
+    <div id="status-msg" class="status-msg status-waiting">
+      <span class="status-icon">⏳</span>
+      <span id="status-text">Waiting for question...</span>
+    </div>
+
+    <!-- THE BUZZER -->
+    <div class="buzzer-wrap">
+      <div class="buzzer-ring ring3"></div>
+      <div class="buzzer-ring ring2"></div>
+      <div class="buzzer-ring ring1"></div>
+      <button id="buzzer-btn" class="buzzer-btn">
+        <div class="buzzer-inner">
+          <span class="buzzer-label">BUZZ!</span>
+          <span class="buzzer-sub">Tap to answer</span>
+        </div>
+      </button>
+    </div>
+
+    <!-- Buzz Results -->
+    <div id="results-panel" class="results-panel glass hidden">
+      <h3 class="results-title">🏆 Buzz Order</h3>
+      <div id="results-list" class="results-list"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="/public/player.js"></script>
+</body>
+</html>

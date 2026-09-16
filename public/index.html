@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quiz Buzzer – Choose Role</title>
+  <link rel="stylesheet" href="/public/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet"/>
+</head>
+<body class="landing-body">
+  <div class="landing-bg">
+    <div class="orb orb1"></div>
+    <div class="orb orb2"></div>
+    <div class="orb orb3"></div>
+  </div>
+
+  <div class="landing-card glass">
+    <div class="logo-wrap">
+      <div class="logo-icon">⚡</div>
+      <h1 class="logo-title">QuizBuzz</h1>
+      <p class="logo-sub">Real-time Quiz Buzzer System</p>
+    </div>
+
+    <p class="role-label">Select your role to continue</p>
+
+    <div class="role-cards">
+      <a href="/player" class="role-card player-card">
+        <div class="role-icon">🎮</div>
+        <div class="role-info">
+          <span class="role-name">Player</span>
+          <span class="role-desc">Press the buzzer to answer</span>
+        </div>
+        <div class="role-arrow">→</div>
+      </a>
+
+      <a href="/admin" class="role-card admin-card">
+        <div class="role-icon">👑</div>
+        <div class="role-info">
+          <span class="role-name">Admin</span>
+          <span class="role-desc">Manage the quiz &amp; view results</span>
+        </div>
+        <div class="role-arrow">→</div>
+      </a>
+    </div>
+
+    <p class="landing-hint">Share the player link with participants to get started</p>
+  </div>
+</body>
+</html>

@@ -4,8 +4,16 @@ import time
 import os
 
 app = Flask(__name__, static_folder='public', template_folder='public')
-app.config['SECRET_KEY'] = 'quiz-buzzer-secret-2024'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'quiz-buzzer-secret-2024')
+
+# Use gevent for production (full WebSocket support), threading for local dev fallback
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode='gevent',
+    ping_timeout=60,
+    ping_interval=25,
+)
 
 # ── In-memory game state ──────────────────────────────────────────────────────
 game_state = {
@@ -31,6 +39,10 @@ def admin():
 @app.route('/public/<path:filename>')
 def static_files(filename):
     return send_from_directory('public', filename)
+
+@app.route('/health')
+def health():
+    return {'status': 'ok'}, 200
 
 # ── Socket events ─────────────────────────────────────────────────────────────
 @socketio.on('connect')
@@ -94,13 +106,14 @@ def serialize_state():
         'question_number': game_state['question_number'],
     }
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+# ── Entry point (local dev only) ──────────────────────────────────────────────
 if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
     print("\n" + "="*55)
     print("  QuizBuzz - Real-time Quiz Buzzer System")
     print("="*55)
-    print("  Home   ->  http://localhost:5000")
-    print("  Admin  ->  http://localhost:5000/admin")
-    print("  Player ->  http://localhost:5000/player")
+    print(f"  Home   ->  http://localhost:{port}")
+    print(f"  Admin  ->  http://localhost:{port}/admin")
+    print(f"  Player ->  http://localhost:{port}/player")
     print("="*55 + "\n")
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)

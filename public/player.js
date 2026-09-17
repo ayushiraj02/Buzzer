@@ -274,6 +274,8 @@ function joinQuiz() {
   document.getElementById('player-name-display').textContent = name;
   document.getElementById('name-screen').classList.remove('active');
   document.getElementById('buzzer-screen').classList.add('active');
+  // Register with server so admin can see this player
+  socket.emit('register_player', { name });
 }
 
 document.getElementById('player-name-input').addEventListener('keydown', e => {

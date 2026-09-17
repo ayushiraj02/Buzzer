@@ -1,4 +1,4 @@
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, request
 from flask_socketio import SocketIO, emit
 import time
 import os
@@ -6,7 +6,6 @@ import os
 app = Flask(__name__, static_folder='public', template_folder='public')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'quiz-buzzer-secret-2024')
 
-# Use gevent for production (full WebSocket support), threading for local dev fallback
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
@@ -15,15 +14,19 @@ socketio = SocketIO(
     ping_interval=25,
 )
 
-# ── In-memory game state ──────────────────────────────────────────────────────
+# ── In-memory state ───────────────────────────────────────────────────────────
 game_state = {
-    'buzzes': [],             # List of {name, timestamp, rank, delta_ms}
-    'question_start': None,   # epoch ms when first buzz happened
-    'armed': True,            # whether buzzing is allowed
-    'question_number': 1,
-    'whiteboard': '',         # Current whiteboard/code question text
-    'whiteboard_active': False,  # Whether whiteboard is visible to players
+    'buzzes':            [],
+    'question_start':    None,
+    'armed':             True,
+    'question_number':   1,
+    'whiteboard':        '',
+    'whiteboard_active': False,
+    'scores':            {},   # {name: int}
 }
+
+# Players: {name: {sid, status('active'|'left'), joined_at}}
+players = {}
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.route('/')
@@ -46,86 +49,139 @@ def static_files(filename):
 def health():
     return {'status': 'ok'}, 200
 
-# ── Socket events ─────────────────────────────────────────────────────────────
+# ── Socket: lifecycle ─────────────────────────────────────────────────────────
 @socketio.on('connect')
 def on_connect():
-    """Send current state to newly connected client."""
     emit('state_update', serialize_state())
+    emit('players_update', serialize_players())
 
-@socketio.on('buzz')
-def on_buzz(data):
-    """Handle a player pressing the buzzer."""
+@socketio.on('disconnect')
+def on_disconnect():
+    sid = request.sid
+    changed = False
+    for name, p in players.items():
+        if p['sid'] == sid and p['status'] == 'active':
+            p['status'] = 'left'
+            changed = True
+            break
+    if changed:
+        socketio.emit('players_update', serialize_players())
+
+# ── Socket: player registration ───────────────────────────────────────────────
+@socketio.on('register_player')
+def on_register_player(data):
     name = data.get('name', '').strip()
     if not name:
         return
+    # If player re-connects with same name, update their sid
+    players[name] = {
+        'sid':       request.sid,
+        'status':    'active',
+        'joined_at': int(time.time() * 1000),
+    }
+    if name not in game_state['scores']:
+        game_state['scores'][name] = 0
+    socketio.emit('players_update', serialize_players())
 
-    now_ms = int(time.time() * 1000)
-
-    # Ignore if buzzing is disabled
-    if not game_state['armed']:
+# ── Socket: buzzer ────────────────────────────────────────────────────────────
+@socketio.on('buzz')
+def on_buzz(data):
+    name = data.get('name', '').strip()
+    if not name or not game_state['armed']:
         return
-
-    # Ignore if player already buzzed
     if any(b['name'] == name for b in game_state['buzzes']):
         return
-
-    # Record the start time on the very first buzz
+    now_ms = int(time.time() * 1000)
     if game_state['question_start'] is None:
         game_state['question_start'] = now_ms
-
     delta_ms = now_ms - game_state['question_start']
     rank = len(game_state['buzzes']) + 1
-
     game_state['buzzes'].append({
-        'name': name,
+        'name':      name,
         'timestamp': now_ms,
-        'rank': rank,
-        'delta_ms': delta_ms,
+        'rank':      rank,
+        'delta_ms':  delta_ms,
     })
-
-    # Broadcast updated state to ALL clients instantly
     socketio.emit('state_update', serialize_state())
 
+# ── Socket: round management ──────────────────────────────────────────────────
 @socketio.on('next_question')
 def on_next_question():
-    """Admin resets the round for a new question."""
-    game_state['buzzes'] = []
+    game_state['buzzes']         = []
     game_state['question_start'] = None
-    game_state['armed'] = True
+    game_state['armed']          = True
     game_state['question_number'] += 1
-    # Keep whiteboard content across questions (admin can clear manually)
     socketio.emit('state_update', serialize_state())
 
+@socketio.on('arm')
+def on_arm():
+    game_state['armed'] = not game_state['armed']
+    socketio.emit('state_update', serialize_state())
+
+# ── Socket: whiteboard ────────────────────────────────────────────────────────
 @socketio.on('send_whiteboard')
 def on_send_whiteboard(data):
-    """Admin broadcasts a question/code to all players."""
-    game_state['whiteboard'] = data.get('content', '')
+    game_state['whiteboard']        = data.get('content', '')
     game_state['whiteboard_active'] = True
     socketio.emit('state_update', serialize_state())
 
 @socketio.on('clear_whiteboard')
 def on_clear_whiteboard():
-    """Admin clears the whiteboard for all players."""
-    game_state['whiteboard'] = ''
+    game_state['whiteboard']        = ''
     game_state['whiteboard_active'] = False
     socketio.emit('state_update', serialize_state())
 
-@socketio.on('arm')
-def on_arm():
-    """Admin toggles arm/disarm of the buzzer."""
-    game_state['armed'] = not game_state['armed']
+# ── Socket: scores ────────────────────────────────────────────────────────────
+@socketio.on('update_score')
+def on_update_score(data):
+    name  = data.get('name', '')
+    delta = int(data.get('delta', 0))
+    if name in game_state['scores']:
+        game_state['scores'][name] = max(0, game_state['scores'][name] + delta)
+    socketio.emit('state_update', serialize_state())
+    socketio.emit('players_update', serialize_players())
+
+@socketio.on('reset_scores')
+def on_reset_scores():
+    for name in game_state['scores']:
+        game_state['scores'][name] = 0
+    socketio.emit('state_update', serialize_state())
+    socketio.emit('players_update', serialize_players())
+
+# ── Socket: remove player ─────────────────────────────────────────────────────
+@socketio.on('remove_player')
+def on_remove_player(data):
+    name = data.get('name', '')
+    players.pop(name, None)
+    game_state['scores'].pop(name, None)
+    socketio.emit('players_update', serialize_players())
     socketio.emit('state_update', serialize_state())
 
+# ── Serializers ───────────────────────────────────────────────────────────────
 def serialize_state():
     return {
-        'buzzes': game_state['buzzes'],
-        'armed': game_state['armed'],
-        'question_number': game_state['question_number'],
-        'whiteboard': game_state['whiteboard'],
+        'buzzes':            game_state['buzzes'],
+        'armed':             game_state['armed'],
+        'question_number':   game_state['question_number'],
+        'whiteboard':        game_state['whiteboard'],
         'whiteboard_active': game_state['whiteboard_active'],
+        'scores':            game_state['scores'],
     }
 
-# ── Entry point (local dev only) ──────────────────────────────────────────────
+def serialize_players():
+    result = []
+    for name, p in players.items():
+        result.append({
+            'name':      name,
+            'status':    p['status'],
+            'joined_at': p['joined_at'],
+            'score':     game_state['scores'].get(name, 0),
+        })
+    # Sort: active first, then by join time
+    result.sort(key=lambda x: (x['status'] != 'active', x['joined_at']))
+    return result
+
+# ── Entry point ───────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print("\n" + "="*55)

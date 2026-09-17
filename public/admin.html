@@ -3,158 +3,234 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>QuizBuzz – Admin Dashboard</title>
+  <title>QuizBuzz – Admin</title>
   <link rel="stylesheet" href="/public/style.css"/>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
 </head>
 <body class="admin-body">
-  <div class="admin-bg">
-    <div class="orb orb1"></div>
-    <div class="orb orb2"></div>
+  <div class="admin-bg"><div class="orb orb1"></div><div class="orb orb2"></div></div>
+
+  <!-- ── PASSWORD OVERLAY ────────────────────────────────────────────── -->
+  <div id="pw-overlay" class="pw-overlay">
+    <div class="pw-card glass">
+      <div class="pw-logo">
+        <div class="pw-logo-icon">⚡</div>
+        <h1 class="pw-title">QuizBuzz</h1>
+        <p class="pw-sub">Admin Access Required</p>
+      </div>
+      <div class="pw-form">
+        <div class="pw-input-wrap">
+          <span class="pw-input-icon">🔐</span>
+          <input type="password" id="pw-input" class="pw-input" placeholder="Enter admin password" autocomplete="off"/>
+          <button class="pw-toggle" onclick="togglePw()" title="Show/hide">👁</button>
+        </div>
+        <div id="pw-error" class="pw-error hidden">❌ Incorrect password. Try again.</div>
+        <button class="btn btn-primary" onclick="checkPassword()">Enter Admin Panel →</button>
+      </div>
+    </div>
   </div>
 
-  <!-- Header -->
-  <header class="admin-header glass">
-    <div class="admin-logo">
-      <span class="admin-logo-icon">⚡</span>
-      <span class="admin-logo-text">QuizBuzz <span class="admin-badge">ADMIN</span></span>
-    </div>
-    <div class="admin-header-right">
-      <div class="question-counter">
-        <span class="qc-label">Question</span>
-        <span class="qc-number" id="admin-q-number">1</span>
+  <!-- ── MAIN ADMIN CONTENT (hidden until auth) ─────────────────────── -->
+  <div id="admin-content" class="hidden">
+
+    <!-- Header -->
+    <header class="admin-header glass">
+      <div class="admin-logo">
+        <span class="admin-logo-icon">⚡</span>
+        <span class="admin-logo-text">QuizBuzz <span class="admin-badge">ADMIN</span></span>
       </div>
-      <div class="connection-dot" id="admin-conn-dot" title="Connected"></div>
-    </div>
-  </header>
-
-  <main class="admin-main">
-
-    <!-- Stats Bar -->
-    <div class="stats-bar">
-      <div class="stat-card glass">
-        <div class="stat-icon">🎯</div>
-        <div class="stat-info">
-          <div class="stat-value" id="total-buzzes">0</div>
-          <div class="stat-label">Buzzed</div>
+      <div class="admin-header-right">
+        <div class="question-counter">
+          <span class="qc-label">Question</span>
+          <span class="qc-number" id="admin-q-number">1</span>
         </div>
+        <div class="connection-dot" id="admin-conn-dot" title="Connected"></div>
       </div>
-      <div class="stat-card glass">
-        <div class="stat-icon">⏱️</div>
-        <div class="stat-info">
-          <div class="stat-value" id="fastest-time">–</div>
-          <div class="stat-label">Fastest (ms)</div>
-        </div>
-      </div>
-      <div class="stat-card glass">
-        <div class="stat-icon">🔔</div>
-        <div class="stat-info">
-          <div class="stat-value" id="status-armed">ARMED</div>
-          <div class="stat-label">Status</div>
-        </div>
-      </div>
-    </div>
+    </header>
 
-    <!-- Main Dashboard -->
-    <div class="dashboard-grid">
+    <!-- Tab Navigation -->
+    <nav class="admin-tabs">
+      <button class="admin-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">
+        <span>🎯</span> Dashboard
+      </button>
+      <button class="admin-tab" data-tab="players" onclick="switchTab('players')">
+        <span>👥</span> Players
+        <span class="tab-count" id="players-count">0</span>
+      </button>
+      <button class="admin-tab" data-tab="scoreboard" onclick="switchTab('scoreboard')">
+        <span>🏆</span> Scoreboard
+      </button>
+    </nav>
 
-      <!-- Leaderboard -->
-      <div class="leaderboard-card glass">
-        <div class="card-header">
-          <h2 class="card-title">🏆 Buzz Leaderboard</h2>
-          <span class="live-badge">LIVE</span>
-        </div>
+    <!-- ── TAB 1: DASHBOARD ──────────────────────────────────────────── -->
+    <div id="tab-dashboard" class="tab-panel admin-main active">
 
-        <div id="no-buzz-msg" class="no-buzz">
-          <div class="no-buzz-icon">🔔</div>
-          <p>Waiting for players to buzz in...</p>
-        </div>
-
-        <div id="leaderboard-list" class="leaderboard-list hidden"></div>
-      </div>
-
-      <!-- Controls -->
-      <div class="controls-card glass">
-        <h2 class="card-title">⚙️ Controls</h2>
-
-        <div class="control-section">
-          <p class="control-label">Round Management</p>
-          <button id="next-btn" class="btn btn-next" onclick="nextQuestion()">
-            <span class="btn-icon">⏭️</span>
-            Next Question
-          </button>
-          <p class="next-hint">Resets buzzer for all players</p>
-        </div>
-
-        <div class="control-section">
-          <p class="control-label">Buzzer Control</p>
-          <button id="arm-btn" class="btn btn-arm" onclick="toggleArm()">
-            <span class="btn-icon" id="arm-icon">🟢</span>
-            <span id="arm-text">Buzzer Armed</span>
-          </button>
-          <p class="next-hint">Enable / disable buzzing</p>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="control-section">
-          <p class="control-label">Quick Instructions</p>
-          <ul class="instructions-list">
-            <li>🎯 Players open <code>/player</code> on their device</li>
-            <li>📢 Read the question aloud</li>
-            <li>🏆 Ask players in rank order</li>
-            <li>⏭️ Click "Next Question" to reset</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <!-- Answer Queue (detailed) -->
-    <div class="answer-queue glass">
-      <h2 class="card-title">📋 Answer Queue</h2>
-      <p class="queue-sub">Call on players in this order to answer</p>
-      <div id="queue-list" class="queue-list">
-        <div class="queue-empty">No buzzes yet — start the question!</div>
-      </div>
-    </div>
-
-    <!-- Whiteboard / Code Question -->
-    <div class="whiteboard-card glass">
-      <div class="card-header">
-        <div>
-          <h2 class="card-title">🖊️ Whiteboard / Code Question</h2>
-          <p class="queue-sub" style="margin-bottom:0">Write a question or code pattern and broadcast to all players</p>
-        </div>
-        <div id="wb-status-badge" class="wb-badge wb-badge-off">OFF</div>
-      </div>
-
-      <div class="wb-editor-wrap">
-        <div class="wb-editor-header">
-          <div class="wb-lang-tabs">
-            <button class="wb-tab active" onclick="setWbMode('text')">📝 Text</button>
-            <button class="wb-tab" onclick="setWbMode('code')">🐍 Code / Pattern</button>
+      <div class="stats-bar">
+        <div class="stat-card glass">
+          <div class="stat-icon">🎯</div>
+          <div class="stat-info">
+            <div class="stat-value" id="total-buzzes">0</div>
+            <div class="stat-label">Buzzed</div>
           </div>
-          <div class="wb-char-count"><span id="wb-char">0</span> chars</div>
         </div>
-        <textarea id="wb-editor" class="wb-editor" placeholder="Type your question or code here...&#10;&#10;Example:&#10;Print the following pattern:&#10;*&#10;* *&#10;* * *" spellcheck="false" oninput="updateWbCount()"></textarea>
+        <div class="stat-card glass">
+          <div class="stat-icon">⏱️</div>
+          <div class="stat-info">
+            <div class="stat-value" id="fastest-time">–</div>
+            <div class="stat-label">Fastest (ms)</div>
+          </div>
+        </div>
+        <div class="stat-card glass">
+          <div class="stat-icon">🔔</div>
+          <div class="stat-info">
+            <div class="stat-value" id="status-armed">ARMED</div>
+            <div class="stat-label">Status</div>
+          </div>
+        </div>
       </div>
 
-      <div class="wb-actions">
-        <button class="btn btn-broadcast" onclick="sendWhiteboard()">
-          <span>📡</span> Broadcast to Players
-        </button>
-        <button class="btn btn-wb-clear" onclick="clearWhiteboard()">
-          <span>🗑️</span> Clear
-        </button>
+      <div class="dashboard-grid">
+        <div class="leaderboard-card glass">
+          <div class="card-header">
+            <h2 class="card-title">🏆 Buzz Leaderboard</h2>
+            <span class="live-badge">LIVE</span>
+          </div>
+          <div id="no-buzz-msg" class="no-buzz">
+            <div class="no-buzz-icon">🔔</div>
+            <p>Waiting for players to buzz in...</p>
+          </div>
+          <div id="leaderboard-list" class="leaderboard-list hidden"></div>
+        </div>
+
+        <div class="controls-card glass">
+          <h2 class="card-title">⚙️ Controls</h2>
+          <div class="control-section">
+            <p class="control-label">Round Management</p>
+            <button id="next-btn" class="btn btn-next" onclick="nextQuestion()">
+              <span class="btn-icon">⏭️</span> Next Question
+            </button>
+            <p class="next-hint">Resets buzzer for all players</p>
+          </div>
+          <div class="control-section">
+            <p class="control-label">Buzzer Control</p>
+            <button id="arm-btn" class="btn btn-arm" onclick="toggleArm()">
+              <span class="btn-icon" id="arm-icon">🟢</span>
+              <span id="arm-text">Buzzer Armed</span>
+            </button>
+            <p class="next-hint">Enable / disable buzzing</p>
+          </div>
+          <div class="divider"></div>
+          <div class="control-section">
+            <p class="control-label">Quick Instructions</p>
+            <ul class="instructions-list">
+              <li>🎯 Players open <code>/player</code> on their device</li>
+              <li>📢 Read the question aloud</li>
+              <li>🏆 Ask players in rank order</li>
+              <li>⏭️ Click "Next Question" to reset</li>
+            </ul>
+          </div>
+        </div>
       </div>
 
-      <div class="wb-preview-wrap">
-        <p class="control-label">Live Preview (what players see)</p>
-        <div id="wb-preview" class="wb-preview">Start typing above to preview...</div>
+      <div class="answer-queue glass">
+        <h2 class="card-title">📋 Answer Queue</h2>
+        <p class="queue-sub">Call on players in this order to answer</p>
+        <div id="queue-list" class="queue-list">
+          <div class="queue-empty">No buzzes yet — start the question!</div>
+        </div>
       </div>
-    </div>
 
-  </main>
+      <div class="whiteboard-card glass">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">🖊️ Whiteboard / Code Question</h2>
+            <p class="queue-sub" style="margin-bottom:0">Broadcast a question or code snippet to all players</p>
+          </div>
+          <div id="wb-status-badge" class="wb-badge wb-badge-off">OFF</div>
+        </div>
+        <div class="wb-editor-wrap">
+          <div class="wb-editor-header">
+            <div class="wb-lang-tabs">
+              <button class="wb-tab active" onclick="setWbMode('text',event)">📝 Text</button>
+              <button class="wb-tab" onclick="setWbMode('code',event)">🐍 Code / Pattern</button>
+            </div>
+            <div class="wb-char-count"><span id="wb-char">0</span> chars</div>
+          </div>
+          <textarea id="wb-editor" class="wb-editor" placeholder="Type your question or code here..." spellcheck="false" oninput="updateWbCount()"></textarea>
+        </div>
+        <div class="wb-actions">
+          <button class="btn btn-broadcast" onclick="sendWhiteboard()"><span>📡</span> Broadcast to Players</button>
+          <button class="btn btn-wb-clear" onclick="clearWhiteboard()"><span>🗑️</span> Clear</button>
+        </div>
+        <div class="wb-preview-wrap">
+          <p class="control-label">Preview</p>
+          <div id="wb-preview" class="wb-preview">Start typing above to preview...</div>
+        </div>
+      </div>
+    </div><!-- end tab-dashboard -->
+
+    <!-- ── TAB 2: PLAYERS ────────────────────────────────────────────── -->
+    <div id="tab-players" class="tab-panel admin-main hidden">
+      <div class="players-header-bar glass">
+        <div class="players-header-info">
+          <h2 class="card-title">👥 Registered Players</h2>
+          <p class="queue-sub" style="margin:0">Players who joined this session</p>
+        </div>
+        <div class="players-header-stats">
+          <div class="pstat">
+            <span class="pstat-value" id="active-count">0</span>
+            <span class="pstat-label">Active</span>
+          </div>
+          <div class="pstat pstat-left">
+            <span class="pstat-value" id="left-count">0</span>
+            <span class="pstat-label">Left</span>
+          </div>
+          <div class="pstat">
+            <span class="pstat-value" id="total-count">0</span>
+            <span class="pstat-label">Total</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="players-grid" class="players-grid">
+        <div class="no-players-msg">
+          <div style="font-size:3rem;margin-bottom:12px">🎮</div>
+          <p>No players have joined yet.<br/>Share <code>/player</code> link with participants.</p>
+        </div>
+      </div>
+    </div><!-- end tab-players -->
+
+    <!-- ── TAB 3: SCOREBOARD ─────────────────────────────────────────── -->
+    <div id="tab-scoreboard" class="tab-panel admin-main hidden">
+      <div class="scoreboard-header glass">
+        <div>
+          <h2 class="card-title">🏆 Scoreboard</h2>
+          <p class="queue-sub" style="margin:0">Award points after each question. Scores update live for all.</p>
+        </div>
+        <button class="btn btn-reset-scores" onclick="resetScores()">🔄 Reset All</button>
+      </div>
+
+      <div id="scoreboard-empty" class="scoreboard-empty glass">
+        <div style="font-size:3rem;margin-bottom:12px">🏆</div>
+        <p>Scores will appear here once players join.</p>
+      </div>
+
+      <div id="scoreboard-table-wrap" class="scoreboard-table-wrap hidden">
+        <table class="scoreboard-table glass">
+          <thead>
+            <tr>
+              <th class="sc-rank">Rank</th>
+              <th class="sc-name">Player</th>
+              <th class="sc-score">Score</th>
+              <th class="sc-actions">Award Points</th>
+            </tr>
+          </thead>
+          <tbody id="scoreboard-body"></tbody>
+        </table>
+      </div>
+    </div><!-- end tab-scoreboard -->
+
+  </div><!-- end admin-content -->
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="/public/admin.js"></script>

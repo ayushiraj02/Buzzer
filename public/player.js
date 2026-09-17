@@ -1,8 +1,252 @@
-/* ── Player Socket Logic + Compiler ─────────────────────────────────────── */
+/* ── Player Socket Logic + Multi-Language Compiler ───────────────────────── */
 
 const socket = io();
-let playerName = '';
+let playerName  = '';
 let hasBuzzed   = false;
+let currentLang = 'python';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LANGUAGE DEFINITIONS  (Piston API: https://emkc.org/api/v2/piston/execute)
+// ─────────────────────────────────────────────────────────────────────────────
+const LANGUAGES = {
+  python: {
+    name: 'Python',     icon: '🐍', version: '3.10',  file: 'main.py',
+    color: '#3b82f6',
+    template:
+`# Python 3
+n = 5
+for i in range(1, n + 1):
+    print('* ' * i)
+`
+  },
+  java: {
+    name: 'Java',       icon: '☕', version: '*',     file: 'Main.java',
+    color: '#f59e0b',
+    template:
+`public class Main {
+    public static void main(String[] args) {
+        System.out.println("Hello, World!");
+        
+        // Pattern example
+        int n = 5;
+        for (int i = 1; i <= n; i++) {
+            for (int j = 0; j < i; j++)
+                System.out.print("* ");
+            System.out.println();
+        }
+    }
+}
+`
+  },
+  kotlin: {
+    name: 'Kotlin',     icon: '🎯', version: '*',     file: 'main.kt',
+    color: '#8b5cf6',
+    template:
+`fun main() {
+    println("Hello, World!")
+    
+    // Pattern
+    val n = 5
+    for (i in 1..n) {
+        println("* ".repeat(i))
+    }
+}
+`
+  },
+  c: {
+    name: 'C',          icon: '⚙️', version: '*',     file: 'main.c',
+    color: '#06b6d4',
+    template:
+`#include <stdio.h>
+
+int main() {
+    printf("Hello, World!\\n");
+    
+    // Pattern
+    int n = 5;
+    for (int i = 1; i <= n; i++) {
+        for (int j = 0; j < i; j++)
+            printf("* ");
+        printf("\\n");
+    }
+    return 0;
+}
+`
+  },
+  cpp: {
+    name: 'C++',        icon: '🔷', version: '*',     file: 'main.cpp',
+    color: '#0ea5e9',
+    template:
+`#include <iostream>
+using namespace std;
+
+int main() {
+    cout << "Hello, World!" << endl;
+    
+    // Pattern
+    int n = 5;
+    for (int i = 1; i <= n; i++) {
+        for (int j = 0; j < i; j++)
+            cout << "* ";
+        cout << endl;
+    }
+    return 0;
+}
+`
+  },
+  javascript: {
+    name: 'JavaScript', icon: '🟨', version: '*',     file: 'main.js',
+    color: '#eab308',
+    template:
+`// JavaScript (Node.js)
+console.log("Hello, World!");
+
+// Pattern
+const n = 5;
+for (let i = 1; i <= n; i++) {
+    console.log("* ".repeat(i));
+}
+`
+  },
+  typescript: {
+    name: 'TypeScript', icon: '🔵', version: '*',     file: 'main.ts',
+    color: '#3b82f6',
+    template:
+`// TypeScript
+const greet = (name: string): string => \`Hello, \${name}!\`;
+console.log(greet("World"));
+
+const n: number = 5;
+for (let i = 1; i <= n; i++) {
+    console.log("* ".repeat(i));
+}
+`
+  },
+  go: {
+    name: 'Go',         icon: '🐹', version: '*',     file: 'main.go',
+    color: '#22d3ee',
+    template:
+`package main
+import "fmt"
+
+func main() {
+    fmt.Println("Hello, World!")
+    
+    // Pattern
+    n := 5
+    for i := 1; i <= n; i++ {
+        for j := 0; j < i; j++ {
+            fmt.Print("* ")
+        }
+        fmt.Println()
+    }
+}
+`
+  },
+  rust: {
+    name: 'Rust',       icon: '🦀', version: '*',     file: 'main.rs',
+    color: '#f97316',
+    template:
+`fn main() {
+    println!("Hello, World!");
+    
+    // Pattern
+    let n = 5;
+    for i in 1..=n {
+        let row = "* ".repeat(i);
+        println!("{}", row);
+    }
+}
+`
+  },
+  csharp: {
+    name: 'C#',         icon: '🟣', version: '*',     file: 'Main.cs',
+    color: '#a855f7',
+    template:
+`using System;
+
+class Main {
+    static void Main(string[] args) {
+        Console.WriteLine("Hello, World!");
+        
+        // Pattern
+        int n = 5;
+        for (int i = 1; i <= n; i++) {
+            Console.WriteLine(new String("* ".ToCharArray()[0], i * 2 - 1));
+        }
+    }
+}
+`
+  },
+  php: {
+    name: 'PHP',        icon: '🐘', version: '*',     file: 'main.php',
+    color: '#7c3aed',
+    template:
+`<?php
+echo "Hello, World!\\n";
+
+// Pattern
+$n = 5;
+for ($i = 1; $i <= $n; $i++) {
+    echo str_repeat("* ", $i) . "\\n";
+}
+`
+  },
+  ruby: {
+    name: 'Ruby',       icon: '💎', version: '*',     file: 'main.rb',
+    color: '#ef4444',
+    template:
+`# Ruby
+puts "Hello, World!"
+
+# Pattern
+n = 5
+(1..n).each do |i|
+  puts ("* " * i)
+end
+`
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BUILD LANGUAGE SELECTOR
+// ─────────────────────────────────────────────────────────────────────────────
+function buildLangGrid() {
+  const grid = document.getElementById('lang-grid');
+  grid.innerHTML = '';
+  Object.entries(LANGUAGES).forEach(([key, lang]) => {
+    const btn = document.createElement('button');
+    btn.className = 'lang-btn' + (key === currentLang ? ' lang-btn-active' : '');
+    btn.dataset.lang = key;
+    btn.style.setProperty('--lang-color', lang.color);
+    btn.innerHTML = `<span class="lang-btn-icon">${lang.icon}</span><span class="lang-btn-name">${lang.name}</span>`;
+    btn.onclick = () => switchLang(key);
+    grid.appendChild(btn);
+  });
+}
+
+function switchLang(key) {
+  currentLang = key;
+  const lang  = LANGUAGES[key];
+
+  // Update active class
+  document.querySelectorAll('.lang-btn').forEach(b => {
+    b.classList.toggle('lang-btn-active', b.dataset.lang === key);
+  });
+
+  // Update toolbar label & icon
+  document.getElementById('lang-icon').textContent       = lang.icon;
+  document.getElementById('editor-lang-label').textContent = lang.name;
+
+  // Load template into editor
+  const editor = document.getElementById('code-editor');
+  editor.value = lang.template;
+  syncLineNums();
+
+  // Clear output
+  clearOutput();
+  document.getElementById('exit-code-badge').classList.add('hidden');
+}
 
 // ── Connection state ──────────────────────────────────────────────────────
 socket.on('connect',    () => setDot('connection-dot', true));
@@ -46,7 +290,6 @@ document.getElementById('buzzer-btn').addEventListener('click', () => {
 // ── State updates from server ─────────────────────────────────────────────
 socket.on('state_update', state => {
   const { buzzes, armed, question_number, whiteboard, whiteboard_active } = state;
-
   document.getElementById('q-number').textContent = question_number;
 
   const myBuzz   = buzzes.find(b => b.name === playerName);
@@ -55,7 +298,6 @@ socket.on('state_update', state => {
   const results  = document.getElementById('results-panel');
   const list     = document.getElementById('results-list');
 
-  // ── Reset for new question ──
   if (buzzes.length === 0) {
     hasBuzzed = false;
     btn.disabled  = !armed;
@@ -66,7 +308,6 @@ socket.on('state_update', state => {
     results.classList.add('hidden');
     list.innerHTML = '';
   } else {
-    // ── Build results list ──
     results.classList.remove('hidden');
     if (list.children.length !== buzzes.length) {
       list.innerHTML = '';
@@ -76,13 +317,10 @@ socket.on('state_update', state => {
         item.innerHTML = `
           <div class="rank-badge rank-${b.rank}">${b.rank}</div>
           <div class="result-name">${escHtml(b.name)}</div>
-          <div class="result-time">+${b.delta_ms} ms</div>
-        `;
+          <div class="result-time">+${b.delta_ms} ms</div>`;
         list.appendChild(item);
       });
     }
-
-    // ── Update buzzer state ──
     if (myBuzz) {
       hasBuzzed = true;
       btn.disabled  = true;
@@ -98,7 +336,6 @@ socket.on('state_update', state => {
     }
   }
 
-  // ── Whiteboard update ──
   updateWhiteboard(whiteboard, whiteboard_active);
 });
 
@@ -112,7 +349,6 @@ function updateWhiteboard(content, active) {
 
   if (active && content) {
     panel.classList.remove('hidden');
-    // Flash NEW badge only when content changes
     if (content !== lastWhiteboardContent) {
       display.textContent = content;
       badge.style.display = 'inline-block';
@@ -130,63 +366,81 @@ function updateWhiteboard(content, active) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PYTHON COMPILER
+// MULTI-LANGUAGE COMPILER  (Piston API)
 // ─────────────────────────────────────────────────────────────────────────────
+const PISTON_URL = 'https://emkc.org/api/v2/piston/execute';
 
 async function runCode() {
-  if (!window.pyodide) return;
-
+  const lang     = LANGUAGES[currentLang];
   const code     = document.getElementById('code-editor').value.trim();
   const runBtn   = document.getElementById('run-btn');
   const runIcon  = document.getElementById('run-icon');
   const runText  = document.getElementById('run-text');
   const output   = document.getElementById('output-area');
+  const exitBadge = document.getElementById('exit-code-badge');
 
   if (!code) {
     output.innerHTML = '<span class="output-warn">⚠️ Nothing to run — write some code first!</span>';
     return;
   }
 
-  // Show running state
-  runBtn.disabled = true;
+  // Running state
+  runBtn.disabled   = true;
   runIcon.textContent = '⏳';
   runText.textContent = 'Running...';
-  output.innerHTML = '<span class="output-placeholder">Running...</span>';
+  output.innerHTML  = `<span class="output-placeholder">Running ${lang.name} code...</span>`;
+  exitBadge.classList.add('hidden');
 
   try {
-    // Reset stdout/stderr buffers
-    window.pyodide.runPython(`
-import sys, io
-sys.stdout = io.StringIO()
-sys.stderr = io.StringIO()
-    `);
+    const res = await fetch(PISTON_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        language: currentLang === 'cpp' ? 'c++' : currentLang === 'csharp' ? 'csharp' : currentLang,
+        version: lang.version,
+        files: [{ name: lang.file, content: code }],
+        stdin: '',
+        args: [],
+      }),
+    });
 
-    // Run user code
-    await window.pyodide.runPythonAsync(code);
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
 
-    // Capture output
-    const stdout = window.pyodide.runPython('sys.stdout.getvalue()');
-    const stderr = window.pyodide.runPython('sys.stderr.getvalue()');
+    const data = await res.json();
+    const run  = data.run || data.compile || {};
+    const compile = data.compile || null;
 
     let html = '';
-    if (stdout) html += `<span class="output-stdout">${escHtml(stdout)}</span>`;
-    if (stderr) html += `<span class="output-stderr">⚠️ ${escHtml(stderr)}</span>`;
-    if (!stdout && !stderr) html = '<span class="output-success">✓ Code ran with no output</span>';
 
-    output.innerHTML = html;
+    // Compilation error (for compiled languages)
+    if (compile && compile.stderr) {
+      html += `<span class="output-compile-err">⚙️ Compile Error:\n${escHtml(compile.stderr)}</span>`;
+    }
+
+    if (run.stdout) html += `<span class="output-stdout">${escHtml(run.stdout)}</span>`;
+    if (run.stderr) html += `<span class="output-stderr">⚠️ ${escHtml(run.stderr)}</span>`;
+    if (!run.stdout && !run.stderr && (!compile || !compile.stderr)) {
+      html = '<span class="output-success">✓ Program exited with no output</span>';
+    }
+
+    output.innerHTML = html || '<span class="output-success">✓ Done</span>';
+
+    // Exit code badge
+    const code_val = run.code ?? 0;
+    exitBadge.textContent = `exit: ${code_val}`;
+    exitBadge.className   = `exit-code-badge ${code_val === 0 ? 'exit-ok' : 'exit-err'}`;
+    exitBadge.classList.remove('hidden');
 
   } catch (err) {
-    // Format Python tracebacks nicely
-    const msg = err.message || String(err);
-    output.innerHTML = `<span class="output-error">❌ ${escHtml(msg)}</span>`;
+    output.innerHTML = `<span class="output-error">❌ ${escHtml(err.message)}\n\nMake sure you're connected to the internet.</span>`;
   }
 
-  // Restore button
-  runBtn.disabled = false;
+  runBtn.disabled     = false;
   runIcon.textContent = '▶';
   runText.textContent = 'Run Code';
 }
 
+// ── Editor utilities ──────────────────────────────────────────────────────
 function clearOutput() {
   document.getElementById('output-area').innerHTML =
     '<span class="output-placeholder">Output will appear here after you run your code...</span>';
@@ -201,26 +455,21 @@ function copyCode() {
   const code = document.getElementById('code-editor').value;
   navigator.clipboard.writeText(code).then(() => {
     const btn = document.querySelector('[onclick="copyCode()"]');
-    btn.textContent = '✅';
-    setTimeout(() => btn.textContent = '📋', 1500);
+    btn.textContent = '✅ Copied!';
+    setTimeout(() => btn.textContent = '📋 Copy', 1800);
   });
 }
 
-function useTemplate() {
-  document.getElementById('code-editor').value =
-`# Pattern example
-n = 5
-for i in range(1, n + 1):
-    print('* ' * i)`;
+function loadTemplate() {
+  document.getElementById('code-editor').value = LANGUAGES[currentLang].template;
   syncLineNums();
 }
 
-// ── Code editor utilities ─────────────────────────────────────────────────
 function syncLineNums() {
-  const editor  = document.getElementById('code-editor');
-  const nums    = document.getElementById('line-nums');
-  const lines   = editor.value.split('\n').length;
-  nums.innerHTML = Array.from({length: lines}, (_, i) => i + 1).join('<br>');
+  const editor = document.getElementById('code-editor');
+  const nums   = document.getElementById('line-nums');
+  const count  = editor.value.split('\n').length;
+  nums.innerHTML = Array.from({length: count}, (_, i) => i + 1).join('<br>');
 }
 
 function syncScroll() {
@@ -233,16 +482,17 @@ function handleTab(e) {
   if (e.key === 'Tab') {
     e.preventDefault();
     const editor = document.getElementById('code-editor');
-    const start  = editor.selectionStart;
-    const end    = editor.selectionEnd;
-    editor.value = editor.value.substring(0, start) + '    ' + editor.value.substring(end);
-    editor.selectionStart = editor.selectionEnd = start + 4;
+    const s = editor.selectionStart, end = editor.selectionEnd;
+    editor.value = editor.value.substring(0, s) + '    ' + editor.value.substring(end);
+    editor.selectionStart = editor.selectionEnd = s + 4;
     syncLineNums();
   }
+  // Ctrl+Enter to run
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    runCode();
+  }
 }
-
-// Initialize line numbers
-syncLineNums();
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function setStatus(el, type, icon, text) {
@@ -253,8 +503,12 @@ function setStatus(el, type, icon, text) {
 
 function escHtml(str) {
   return String(str)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
     .replace(/\n/g, '<br>');
 }
+
+// ── Init ──────────────────────────────────────────────────────────────────
+buildLangGrid();
+switchLang('python');   // default language

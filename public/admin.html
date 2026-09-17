@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>QuizBuzz – Admin Dashboard</title>
   <link rel="stylesheet" href="/public/style.css"/>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
 </head>
 <body class="admin-body">
   <div class="admin-bg">
@@ -115,6 +115,42 @@
       <p class="queue-sub">Call on players in this order to answer</p>
       <div id="queue-list" class="queue-list">
         <div class="queue-empty">No buzzes yet — start the question!</div>
+      </div>
+    </div>
+
+    <!-- Whiteboard / Code Question -->
+    <div class="whiteboard-card glass">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">🖊️ Whiteboard / Code Question</h2>
+          <p class="queue-sub" style="margin-bottom:0">Write a question or code pattern and broadcast to all players</p>
+        </div>
+        <div id="wb-status-badge" class="wb-badge wb-badge-off">OFF</div>
+      </div>
+
+      <div class="wb-editor-wrap">
+        <div class="wb-editor-header">
+          <div class="wb-lang-tabs">
+            <button class="wb-tab active" onclick="setWbMode('text')">📝 Text</button>
+            <button class="wb-tab" onclick="setWbMode('code')">🐍 Code / Pattern</button>
+          </div>
+          <div class="wb-char-count"><span id="wb-char">0</span> chars</div>
+        </div>
+        <textarea id="wb-editor" class="wb-editor" placeholder="Type your question or code here...&#10;&#10;Example:&#10;Print the following pattern:&#10;*&#10;* *&#10;* * *" spellcheck="false" oninput="updateWbCount()"></textarea>
+      </div>
+
+      <div class="wb-actions">
+        <button class="btn btn-broadcast" onclick="sendWhiteboard()">
+          <span>📡</span> Broadcast to Players
+        </button>
+        <button class="btn btn-wb-clear" onclick="clearWhiteboard()">
+          <span>🗑️</span> Clear
+        </button>
+      </div>
+
+      <div class="wb-preview-wrap">
+        <p class="control-label">Live Preview (what players see)</p>
+        <div id="wb-preview" class="wb-preview">Start typing above to preview...</div>
       </div>
     </div>
 

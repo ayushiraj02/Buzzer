@@ -21,6 +21,8 @@ game_state = {
     'question_start': None,   # epoch ms when first buzz happened
     'armed': True,            # whether buzzing is allowed
     'question_number': 1,
+    'whiteboard': '',         # Current whiteboard/code question text
+    'whiteboard_active': False,  # Whether whiteboard is visible to players
 }
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -91,6 +93,21 @@ def on_next_question():
     game_state['question_start'] = None
     game_state['armed'] = True
     game_state['question_number'] += 1
+    # Keep whiteboard content across questions (admin can clear manually)
+    socketio.emit('state_update', serialize_state())
+
+@socketio.on('send_whiteboard')
+def on_send_whiteboard(data):
+    """Admin broadcasts a question/code to all players."""
+    game_state['whiteboard'] = data.get('content', '')
+    game_state['whiteboard_active'] = True
+    socketio.emit('state_update', serialize_state())
+
+@socketio.on('clear_whiteboard')
+def on_clear_whiteboard():
+    """Admin clears the whiteboard for all players."""
+    game_state['whiteboard'] = ''
+    game_state['whiteboard_active'] = False
     socketio.emit('state_update', serialize_state())
 
 @socketio.on('arm')
@@ -104,6 +121,8 @@ def serialize_state():
         'buzzes': game_state['buzzes'],
         'armed': game_state['armed'],
         'question_number': game_state['question_number'],
+        'whiteboard': game_state['whiteboard'],
+        'whiteboard_active': game_state['whiteboard_active'],
     }
 
 # ── Entry point (local dev only) ──────────────────────────────────────────────

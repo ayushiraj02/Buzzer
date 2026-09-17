@@ -1,6 +1,7 @@
 /* ── Admin Socket Logic ──────────────────────────────────────────────────── */
 
 const socket = io();
+let wbMode = 'text'; // 'text' or 'code'
 
 // ── Connection ────────────────────────────────────────────────────────────
 socket.on('connect',    () => setDot('admin-conn-dot', true));
@@ -27,7 +28,7 @@ function toggleArm() {
 
 // ── State updates ─────────────────────────────────────────────────────────
 socket.on('state_update', state => {
-  const { buzzes, armed, question_number } = state;
+  const { buzzes, armed, question_number, whiteboard_active } = state;
 
   // Question counter
   document.getElementById('admin-q-number').textContent = question_number;
@@ -43,6 +44,9 @@ socket.on('state_update', state => {
   // Arm button
   document.getElementById('arm-icon').textContent = armed ? '🟢' : '🔴';
   document.getElementById('arm-text').textContent = armed ? 'Buzzer Armed' : 'Buzzer Locked';
+
+  // Whiteboard badge sync
+  updateWbBadge(whiteboard_active);
 
   renderLeaderboard(buzzes);
   renderQueue(buzzes);
@@ -117,4 +121,73 @@ function medalFor(rank) {
 
 function escHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WHITEBOARD FUNCTIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function setWbMode(mode) {
+  wbMode = mode;
+  const editor = document.getElementById('wb-editor');
+  const tabs   = document.querySelectorAll('.wb-tab');
+
+  tabs.forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+
+  if (mode === 'code') {
+    editor.style.fontFamily = "'JetBrains Mono', monospace";
+    editor.style.fontSize   = '0.88rem';
+  } else {
+    editor.style.fontFamily = "inherit";
+    editor.style.fontSize   = '1rem';
+  }
+}
+
+function updateWbCount() {
+  const len = document.getElementById('wb-editor').value.length;
+  document.getElementById('wb-char').textContent = len;
+  // Update preview
+  const preview = document.getElementById('wb-preview');
+  const val = document.getElementById('wb-editor').value;
+  preview.textContent = val || 'Start typing above to preview...';
+  preview.style.color = val ? 'var(--text)' : 'var(--text-dim)';
+}
+
+function sendWhiteboard() {
+  const content = document.getElementById('wb-editor').value.trim();
+  if (!content) {
+    document.getElementById('wb-editor').style.borderColor = 'var(--danger)';
+    setTimeout(() => document.getElementById('wb-editor').style.borderColor = '', 1500);
+    return;
+  }
+  socket.emit('send_whiteboard', { content });
+
+  // Update badge
+  const badge = document.getElementById('wb-status-badge');
+  badge.textContent = 'LIVE';
+  badge.className   = 'wb-badge wb-badge-on';
+
+  // Flash button feedback
+  const btn = document.querySelector('.btn-broadcast');
+  btn.textContent = '✅ Sent!';
+  setTimeout(() => { btn.innerHTML = '<span>📡</span> Broadcast to Players'; }, 2000);
+}
+
+function clearWhiteboard() {
+  document.getElementById('wb-editor').value = '';
+  document.getElementById('wb-preview').textContent = 'Start typing above to preview...';
+  document.getElementById('wb-char').textContent = '0';
+  socket.emit('clear_whiteboard');
+
+  const badge = document.getElementById('wb-status-badge');
+  badge.textContent = 'OFF';
+  badge.className   = 'wb-badge wb-badge-off';
+}
+
+// Update whiteboard badge from state sync
+function updateWbBadge(active) {
+  const badge = document.getElementById('wb-status-badge');
+  badge.textContent = active ? 'LIVE' : 'OFF';
+  badge.className   = active ? 'wb-badge wb-badge-on' : 'wb-badge wb-badge-off';
 }

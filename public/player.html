@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>QuizBuzz – Player</title>
   <link rel="stylesheet" href="/public/style.css"/>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
 </head>
 <body class="player-body">
   <div class="bg-glow"></div>
@@ -60,9 +60,104 @@
       <h3 class="results-title">🏆 Buzz Order</h3>
       <div id="results-list" class="results-list"></div>
     </div>
-  </div>
+
+    <!-- ── WHITEBOARD ─────────────────────────────────────────────────────── -->
+    <div id="whiteboard-panel" class="whiteboard-player glass hidden">
+      <div class="wb-player-header">
+        <div class="wb-player-title">
+          <span class="wb-ping-dot"></span>
+          <span>📋 Question from Admin</span>
+        </div>
+        <span class="wb-new-badge" id="wb-new-badge">NEW</span>
+      </div>
+      <pre id="whiteboard-content" class="wb-player-content"></pre>
+    </div>
+
+    <!-- ── PYTHON COMPILER ────────────────────────────────────────────────── -->
+    <div class="compiler-panel glass">
+      <div class="compiler-header">
+        <div class="compiler-title">
+          <span class="py-icon">🐍</span>
+          <span>Python Playground</span>
+          <span class="compiler-badge">Runs in your browser</span>
+        </div>
+        <div id="py-status" class="py-status py-loading">Loading Python...</div>
+      </div>
+
+      <div class="compiler-body">
+        <div class="code-editor-wrap">
+          <div class="code-editor-toolbar">
+            <span class="editor-lang">Python 3</span>
+            <div class="editor-actions">
+              <button class="editor-action-btn" onclick="copyCode()" title="Copy code">📋</button>
+              <button class="editor-action-btn" onclick="clearCode()" title="Clear editor">🗑️</button>
+              <button class="editor-action-btn" onclick="useTemplate()" title="Load template">📄</button>
+            </div>
+          </div>
+          <div class="line-nums-wrap">
+            <div id="line-nums" class="line-nums">1</div>
+            <textarea id="code-editor"
+              class="code-editor"
+              placeholder="# Write your Python code here&#10;print('Hello, World!')"
+              spellcheck="false"
+              oninput="syncLineNums()"
+              onscroll="syncScroll()"
+              onkeydown="handleTab(event)"></textarea>
+          </div>
+        </div>
+
+        <button id="run-btn" class="btn btn-run" onclick="runCode()" disabled>
+          <span id="run-icon">▶</span>
+          <span id="run-text">Run Code</span>
+        </button>
+
+        <div class="output-wrap">
+          <div class="output-header">
+            <span class="output-title">⚡ Output</span>
+            <button class="editor-action-btn" onclick="clearOutput()">Clear</button>
+          </div>
+          <div id="output-area" class="output-area">
+            <span class="output-placeholder">Output will appear here after you run your code...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end buzzer-screen -->
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="/public/player.js"></script>
+
+  <!-- Load Pyodide (Python in WebAssembly) -->
+  <script>
+    async function loadPyodideAndSetup() {
+      try {
+        const pyodideModule = await import('https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.mjs');
+        window.pyodide = await pyodideModule.loadPyodide();
+
+        // Redirect stdout / stderr to our output area
+        window.pyodide.runPython(`
+import sys
+import io
+
+class OutputCapture(io.StringIO):
+    pass
+
+sys.stdout = OutputCapture()
+sys.stderr = OutputCapture()
+        `);
+
+        document.getElementById('run-btn').disabled = false;
+        const statusEl = document.getElementById('py-status');
+        statusEl.textContent = 'Ready ✓';
+        statusEl.className = 'py-status py-ready';
+      } catch (e) {
+        const statusEl = document.getElementById('py-status');
+        statusEl.textContent = 'Failed to load';
+        statusEl.className = 'py-status py-error';
+      }
+    }
+    loadPyodideAndSetup();
+  </script>
 </body>
 </html>

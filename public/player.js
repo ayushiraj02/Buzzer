@@ -368,17 +368,16 @@ function updateWhiteboard(content, active) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MULTI-LANGUAGE COMPILER  (Piston API)
+// CODE EXECUTION  (Pyodide for Python | server proxy for all other languages)
 // ─────────────────────────────────────────────────────────────────────────────
-const PISTON_URL = 'https://emkc.org/api/v2/piston/execute';
 
 async function runCode() {
-  const lang     = LANGUAGES[currentLang];
-  const code     = document.getElementById('code-editor').value.trim();
-  const runBtn   = document.getElementById('run-btn');
-  const runIcon  = document.getElementById('run-icon');
-  const runText  = document.getElementById('run-text');
-  const output   = document.getElementById('output-area');
+  const lang      = LANGUAGES[currentLang];
+  const code      = document.getElementById('code-editor').value.trim();
+  const runBtn    = document.getElementById('run-btn');
+  const runIcon   = document.getElementById('run-icon');
+  const runText   = document.getElementById('run-text');
+  const output    = document.getElementById('output-area');
   const exitBadge = document.getElementById('exit-code-badge');
 
   if (!code) {
@@ -387,60 +386,94 @@ async function runCode() {
   }
 
   // Running state
-  runBtn.disabled   = true;
+  runBtn.disabled     = true;
   runIcon.textContent = '⏳';
   runText.textContent = 'Running...';
-  output.innerHTML  = `<span class="output-placeholder">Running ${lang.name} code...</span>`;
+  output.innerHTML    = `<span class="output-placeholder">Running ${lang.name} code...</span>`;
   exitBadge.classList.add('hidden');
 
   try {
-    const res = await fetch(PISTON_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        language: currentLang === 'cpp' ? 'c++' : currentLang === 'csharp' ? 'csharp' : currentLang,
-        version: lang.version,
-        files: [{ name: lang.file, content: code }],
-        stdin: '',
-        args: [],
-      }),
-    });
-
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
-
-    const data = await res.json();
-    const run  = data.run || data.compile || {};
-    const compile = data.compile || null;
-
-    let html = '';
-
-    // Compilation error (for compiled languages)
-    if (compile && compile.stderr) {
-      html += `<span class="output-compile-err">⚙️ Compile Error:\n${escHtml(compile.stderr)}</span>`;
+    if (currentLang === 'python' && window.pyodideReady) {
+      await runWithPyodide(code, output, exitBadge);
+    } else {
+      await runWithProxy(lang, code, output, exitBadge);
     }
-
-    if (run.stdout) html += `<span class="output-stdout">${escHtml(run.stdout)}</span>`;
-    if (run.stderr) html += `<span class="output-stderr">⚠️ ${escHtml(run.stderr)}</span>`;
-    if (!run.stdout && !run.stderr && (!compile || !compile.stderr)) {
-      html = '<span class="output-success">✓ Program exited with no output</span>';
-    }
-
-    output.innerHTML = html || '<span class="output-success">✓ Done</span>';
-
-    // Exit code badge
-    const code_val = run.code ?? 0;
-    exitBadge.textContent = `exit: ${code_val}`;
-    exitBadge.className   = `exit-code-badge ${code_val === 0 ? 'exit-ok' : 'exit-err'}`;
-    exitBadge.classList.remove('hidden');
-
-  } catch (err) {
-    output.innerHTML = `<span class="output-error">❌ ${escHtml(err.message)}\n\nMake sure you're connected to the internet.</span>`;
+  } catch(err) {
+    output.innerHTML = `<span class="output-error">❌ Unexpected error: ${escHtml(String(err))}</span>`;
   }
 
   runBtn.disabled     = false;
   runIcon.textContent = '▶';
   runText.textContent = 'Run Code';
 }
+
+// ── Python via Pyodide (browser, no network) ──────────────────────────────
+async function runWithPyodide(code, output, exitBadge) {
+  try {
+    window.pyodide.runPython(`import sys, io; sys.stdout = io.StringIO(); sys.stderr = io.StringIO()`);
+    await window.pyodide.runPythonAsync(code);
+    const stdout = window.pyodide.runPython('sys.stdout.getvalue()');
+    const stderr = window.pyodide.runPython('sys.stderr.getvalue()');
+
+    let html = '';
+    if (stdout) html += `<span class="output-stdout">${escHtml(stdout)}</span>`;
+    if (stderr) html += `<span class="output-stderr">⚠️ ${escHtml(stderr)}</span>`;
+    if (!stdout && !stderr) html = '<span class="output-success">✓ Code ran with no output</span>';
+
+    output.innerHTML = html;
+    exitBadge.textContent = 'exit: 0';
+    exitBadge.className   = 'exit-code-badge exit-ok';
+    exitBadge.classList.remove('hidden');
+  } catch(err) {
+    const msg = err.message || String(err);
+    output.innerHTML = `<span class="output-error">❌ ${escHtml(msg)}</span>`;
+    exitBadge.textContent = 'exit: 1';
+    exitBadge.className   = 'exit-code-badge exit-err';
+    exitBadge.classList.remove('hidden');
+  }
+}
+
+// ── Other languages via server-side proxy ────────────────────────────────
+async function runWithProxy(lang, code, output, exitBadge) {
+  const res = await fetch('/api/run', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      language: currentLang === 'cpp'    ? 'c++'    :
+                currentLang === 'csharp' ? 'csharp' : currentLang,
+      version: lang.version,
+      files:   [{ name: lang.file, content: code }],
+      stdin:   '',
+      args:    [],
+    }),
+  });
+
+  const data = await res.json();
+
+  if (data.error) {
+    output.innerHTML = `<span class="output-error">❌ ${escHtml(data.error)}</span>`;
+    return;
+  }
+
+  const run     = data.run || {};
+  const compile = data.compile || null;
+
+  let html = '';
+  if (compile && compile.stderr) {
+    html += `<span class="output-compile-err">⚙️ Compile Error:\n${escHtml(compile.stderr)}</span>`;
+  }
+  if (run.stdout) html += `<span class="output-stdout">${escHtml(run.stdout)}</span>`;
+  if (run.stderr) html += `<span class="output-stderr">⚠️ ${escHtml(run.stderr)}</span>`;
+  if (!html)      html  = '<span class="output-success">✓ Program exited with no output</span>';
+
+  output.innerHTML = html;
+
+  const exitCode = run.code ?? 0;
+  exitBadge.textContent = `exit: ${exitCode}`;
+  exitBadge.className   = `exit-code-badge ${exitCode === 0 ? 'exit-ok' : 'exit-err'}`;
+  exitBadge.classList.remove('hidden');
+}
+
 
 // ── Editor utilities ──────────────────────────────────────────────────────
 function clearOutput() {

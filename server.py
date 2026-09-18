@@ -1,7 +1,10 @@
-from flask import Flask, send_from_directory, request
+from flask import Flask, send_from_directory, request, jsonify
 from flask_socketio import SocketIO, emit
 import time
 import os
+import json
+import urllib.request
+import urllib.error
 
 app = Flask(__name__, static_folder='public', template_folder='public')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'quiz-buzzer-secret-2024')
@@ -48,6 +51,33 @@ def static_files(filename):
 @app.route('/health')
 def health():
     return {'status': 'ok'}, 200
+
+@app.route('/api/run', methods=['POST'])
+def run_code_proxy():
+    """
+    Server-side proxy to Piston code execution API.
+    Avoids client-side CORS / auth issues.
+    """
+    PISTON_URL = 'https://emkc.org/api/v2/piston/execute'
+    try:
+        payload = request.get_json(force=True)
+        req = urllib.request.Request(
+            PISTON_URL,
+            data=json.dumps(payload).encode('utf-8'),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode('utf-8'))
+            return jsonify(result)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace')
+        return jsonify({'error': f'Code execution API error {e.code}: {body}'}), 502
+    except urllib.error.URLError as e:
+        return jsonify({'error': f'Cannot reach execution API: {e.reason}'}), 503
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 # ── Socket: lifecycle ─────────────────────────────────────────────────────────
 @socketio.on('connect')

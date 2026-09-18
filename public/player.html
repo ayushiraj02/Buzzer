@@ -10,7 +10,7 @@
 <body class="player-body">
   <div class="bg-glow"></div>
 
-  <!-- Name Entry Screen -->
+  <!-- ── NAME ENTRY SCREEN ─────────────────────────────────────── -->
   <div id="name-screen" class="screen active">
     <div class="name-card glass">
       <div class="name-icon">🎮</div>
@@ -23,8 +23,9 @@
     </div>
   </div>
 
-  <!-- Buzzer Screen -->
+  <!-- ── BUZZER SCREEN ─────────────────────────────────────────── -->
   <div id="buzzer-screen" class="screen">
+
     <div class="player-header glass">
       <div class="player-avatar" id="player-avatar">A</div>
       <div>
@@ -70,68 +71,91 @@
       <pre id="whiteboard-content" class="wb-player-content"></pre>
     </div>
 
-    <!-- ── MULTI-LANGUAGE COMPILER ─────────────────────────────────────── -->
-    <div class="compiler-panel glass">
-      <div class="compiler-header">
-        <div class="compiler-title">
-          <span class="py-icon" id="lang-icon">💻</span>
+    <!-- ── CODE PLAYGROUND ────────────────────────────────────── -->
+    <div class="playground-section">
+      <div class="playground-title-bar">
+        <div class="playground-title">
+          <span id="lang-icon">💻</span>
           <span>Code Playground</span>
+        </div>
+        <div class="playground-meta">
           <span class="compiler-badge">60+ Languages</span>
+          <div id="py-status" class="py-status py-loading">Loading Python...</div>
         </div>
-        <div id="py-status" class="py-status py-ready">Ready ✓</div>
       </div>
 
-      <!-- Language Selector -->
+      <!-- Language grid -->
       <div class="lang-selector-wrap">
-        <div class="lang-grid" id="lang-grid">
-          <!-- populated by JS -->
+        <div class="lang-grid" id="lang-grid"></div>
+      </div>
+
+      <!-- Editor -->
+      <div class="playground-editor-wrap">
+        <div class="code-editor-toolbar">
+          <span class="editor-lang" id="editor-lang-label">Python 3</span>
+          <div class="editor-actions">
+            <button class="editor-action-btn" onclick="loadTemplate()" title="Starter template">📄 Template</button>
+            <button class="editor-action-btn" onclick="copyCode()" title="Copy code">📋 Copy</button>
+            <button class="editor-action-btn" onclick="clearCode()" title="Clear">🗑️ Clear</button>
+          </div>
+        </div>
+        <div class="line-nums-wrap">
+          <div id="line-nums" class="line-nums">1</div>
+          <textarea id="code-editor"
+            class="code-editor"
+            spellcheck="false"
+            oninput="syncLineNums()"
+            onscroll="syncScroll()"
+            onkeydown="handleTab(event)"></textarea>
         </div>
       </div>
 
-      <div class="compiler-body">
-        <div class="code-editor-wrap">
-          <div class="code-editor-toolbar">
-            <span class="editor-lang" id="editor-lang-label">Python 3</span>
-            <div class="editor-actions">
-              <button class="editor-action-btn" onclick="copyCode()" title="Copy code">📋 Copy</button>
-              <button class="editor-action-btn" onclick="clearCode()" title="Clear">🗑️ Clear</button>
-              <button class="editor-action-btn" onclick="loadTemplate()" title="Load starter template">📄 Template</button>
-            </div>
-          </div>
-          <div class="line-nums-wrap">
-            <div id="line-nums" class="line-nums">1</div>
-            <textarea id="code-editor"
-              class="code-editor"
-              spellcheck="false"
-              oninput="syncLineNums()"
-              onscroll="syncScroll()"
-              onkeydown="handleTab(event)"></textarea>
+      <!-- Run button -->
+      <button id="run-btn" class="btn btn-run" onclick="runCode()">
+        <span id="run-icon">▶</span>
+        <span id="run-text">Run Code</span>
+        <span class="run-shortcut">Ctrl + Enter</span>
+      </button>
+
+      <!-- Output -->
+      <div class="playground-output-wrap">
+        <div class="output-header">
+          <span class="output-title">⚡ Output</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span id="exit-code-badge" class="exit-code-badge hidden"></span>
+            <button class="editor-action-btn" onclick="clearOutput()">Clear</button>
           </div>
         </div>
-
-        <button id="run-btn" class="btn btn-run" onclick="runCode()">
-          <span id="run-icon">▶</span>
-          <span id="run-text">Run Code</span>
-        </button>
-
-        <div class="output-wrap">
-          <div class="output-header">
-            <span class="output-title">⚡ Output</span>
-            <div style="display:flex;gap:8px;align-items:center">
-              <span id="exit-code-badge" class="exit-code-badge hidden"></span>
-              <button class="editor-action-btn" onclick="clearOutput()">Clear</button>
-            </div>
-          </div>
-          <div id="output-area" class="output-area">
-            <span class="output-placeholder">Output will appear here after you run your code...</span>
-          </div>
+        <div id="output-area" class="output-area">
+          <span class="output-placeholder">Output will appear here after you run your code...</span>
         </div>
       </div>
-    </div>
+    </div><!-- end playground-section -->
 
   </div><!-- end buzzer-screen -->
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="/public/player.js"></script>
+
+  <!-- Load Pyodide for Python (background, non-blocking) -->
+  <script type="module">
+    async function initPyodide() {
+      try {
+        const mod = await import('https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.mjs');
+        window.pyodide = await mod.loadPyodide();
+        // Redirect stdout/stderr
+        window.pyodide.runPython(`import sys, io; sys.stdout = io.StringIO(); sys.stderr = io.StringIO()`);
+        window.pyodideReady = true;
+        // Update UI
+        const el = document.getElementById('py-status');
+        if (el) { el.textContent = 'Python Ready ✓'; el.className = 'py-status py-ready'; }
+      } catch(e) {
+        window.pyodideReady = false;
+        const el = document.getElementById('py-status');
+        if (el) { el.textContent = 'Python (API)'; el.className = 'py-status py-ready'; }
+      }
+    }
+    initPyodide();
+  </script>
 </body>
 </html>

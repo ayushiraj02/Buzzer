@@ -425,8 +425,19 @@ async function runWithPyodide(code, output, exitBadge) {
     exitBadge.className   = 'exit-code-badge exit-ok';
     exitBadge.classList.remove('hidden');
   } catch(err) {
-    const msg = err.message || String(err);
-    output.innerHTML = `<span class="output-error">❌ ${escHtml(msg)}</span>`;
+    // Use Python's traceback module to get the full traceback (file, line, type, message)
+    let fullTraceback = '';
+    try {
+      fullTraceback = window.pyodide.runPython(
+        'import traceback; traceback.format_exc()'
+      );
+    } catch(_) {}
+
+    // format_exc() returns 'NoneType: None\n' when no exception is active — fall back to err.message
+    const isNone = !fullTraceback || fullTraceback.trim() === 'NoneType: None';
+    const display = isNone ? (err.message || String(err)) : fullTraceback;
+    output.innerHTML = `<span class="output-error">❌ ${escHtml(display)}</span>`;
+
     exitBadge.textContent = 'exit: 1';
     exitBadge.className   = 'exit-code-badge exit-err';
     exitBadge.classList.remove('hidden');
